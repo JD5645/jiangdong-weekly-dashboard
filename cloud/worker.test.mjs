@@ -97,3 +97,18 @@ test('editor upload and report save are committed to GitHub, with conflict detec
   assert.equal(download.status, 200);
   assert.deepEqual(Buffer.from(await download.arrayBuffer()), bytes);
 });
+
+test('GitHub credential failures return a handled sync error', async () => {
+  const mockFetch = globalThis.fetch;
+  const mockError = console.error;
+  globalThis.fetch = async () => Response.json({ message: 'Bad credentials' }, { status: 401 });
+  console.error = () => {};
+  try {
+    const response = await invoke('/api/state');
+    assert.equal(response.status, 502);
+    assert.deepEqual(await response.json(), { error: 'Cloud sync is unavailable' });
+  } finally {
+    globalThis.fetch = mockFetch;
+    console.error = mockError;
+  }
+});

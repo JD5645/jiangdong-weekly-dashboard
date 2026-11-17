@@ -209,28 +209,28 @@ export default {
     try {
       const url = new URL(request.url);
       const path = url.pathname;
-      if (path === '/api/state' && request.method === 'GET') return readState(env);
+      if (path === '/api/state' && request.method === 'GET') return await readState(env);
       const readFile = path.match(/^\/api\/attachments\/([^/]+)$/);
-      if (readFile && request.method === 'GET') return readAttachment(env, readFile[1]);
+      if (readFile && request.method === 'GET') return await readAttachment(env, readFile[1]);
 
       if (path.startsWith('/editor') || path.startsWith('/api/write/')) {
         const email = await verifyEditor(request, env);
         if (!email) return json({ error: 'Editor login required' }, 403);
         if (path === '/api/write/session' && request.method === 'GET') return env.GITHUB_TOKEN ? json({ canEdit: true, email }) : json({ error: 'GitHub write credential is not configured' }, 503);
-        if (path === '/api/write/state' && request.method === 'PUT') return saveState(request, env);
+        if (path === '/api/write/state' && request.method === 'PUT') return await saveState(request, env);
         const writeFile = path.match(/^\/api\/write\/attachments\/([^/]+)$/);
-        if (writeFile && request.method === 'PUT') return saveAttachment(request, env, writeFile[1]);
+        if (writeFile && request.method === 'PUT') return await saveAttachment(request, env, writeFile[1]);
         if (path === '/editor' || path === '/editor/') {
           const assetUrl = new URL('/dashboard.html', request.url);
-          return env.ASSETS.fetch(new Request(assetUrl, request));
+          return await env.ASSETS.fetch(new Request(assetUrl, request));
         }
         return json({ error: 'Not found' }, 404);
       }
       if (path === '/') {
         const assetUrl = new URL('/dashboard.html', request.url);
-        return env.ASSETS.fetch(new Request(assetUrl, request));
+        return await env.ASSETS.fetch(new Request(assetUrl, request));
       }
-      return env.ASSETS.fetch(request);
+      return await env.ASSETS.fetch(request);
     } catch (error) {
       console.error(JSON.stringify({ event: 'worker_error', message: String(error?.message || error) }));
       return json({ error: 'Cloud sync is unavailable' }, 502);
