@@ -1965,7 +1965,11 @@ Tesseract.js Core
         $('#cloudAction').disabled=cloudEditor;
         setSaveState('正在读取 GitHub 报告…',false);
         try {
-          const response=await fetch('/api/state',{cache:'no-store'});
+          let response;
+          for(let attempt=0;attempt<3;attempt++){
+            try{response=await fetch('/api/state',{cache:'no-store'});if(response.ok || response.status<500)break;}catch(error){if(attempt===2)throw error;}
+            if(attempt<2)await new Promise(resolve=>setTimeout(resolve,500*(attempt+1)));
+          }
           if(!response.ok)throw new Error(`读取失败 (${response.status})`);
           const data=await response.json();
           if(data.reports && typeof data.reports==='object' && !Array.isArray(data.reports) && Object.keys(data.reports).length)reports=data.reports;
