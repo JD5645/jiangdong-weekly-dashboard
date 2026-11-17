@@ -1,0 +1,4 @@
+interface:
+  display_name: "江东·周报汇报看板生成"
+  short_description: "解析工作周报，匹配型号附件并生成本地 HTML 看板"
+  default_prompt: "使用 $jiangdong-weekly-dashboard；待解析文件：[文件或网页链接]；路径：[附件目录或文件]；备注：[可省略]。"

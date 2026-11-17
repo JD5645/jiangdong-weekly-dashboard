@@ -1,0 +1,9 @@
+node_modules/
+public/
+dist/
+.cloudflare/
+.wrangler/
+.dev.vars*
+.env*
+source/
+assets/*/manifest.json

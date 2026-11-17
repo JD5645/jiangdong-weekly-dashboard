@@ -1,0 +1,50 @@
+const fs = require('node:fs');
+const path = require('node:path');
+const vm = require('node:vm');
+const crypto = require('node:crypto');
+
+const root = path.resolve(__dirname, '..');
+const html = fs.readFileSync(path.join(root, '周期汇报看板.html'), 'utf8');
+const match = html.match(/<script id="bundledWeeklyReport" type="application\/json">([\s\S]*?)<\/script>/);
+if (!match) throw new Error('Bundled weekly report is missing');
+const bundledReports = JSON.parse(match[1]);
+const report = (Array.isArray(bundledReports) ? bundledReports : [bundledReports]).find(item => item.dateStart === '2026-11-09');
+if (!report) throw new Error('Expected reporting week is missing');
+if (report.dateStart !== '2026-11-09' || report.dateEnd !== '2026-11-15') throw new Error('Wrong reporting dates');
+if (report.work.length !== 5) throw new Error('Expected five work items');
+const expected = [8, 10, 12, 1, 2];
+const details = report.work.flatMap((item, index) => {
+  if (item.quantity !== expected[index] || item.details.length !== expected[index]) throw new Error(`Count mismatch at item ${index}`);
+  return item.details.map(detail => ({ detail, item }));
+});
+if (details.length !== 33) throw new Error('Expected 33 model and file details');
+const assets = new Map();
+for (const { detail, item } of details) {
+  if (!detail.name.trim()) throw new Error('Empty event name');
+  const attachment = item.attachments.find(asset => asset.id === detail.attachmentId);
+  if (!attachment) throw new Error(`Missing attachment for ${detail.name}`);
+  if (!/^assets\/2026-11-09\/[A-Za-z0-9._-]+\.(?:png|jpe?g|webp|pdf)$/i.test(attachment.localPath)) throw new Error(`Invalid asset path for ${detail.name}`);
+  const filename = path.resolve(root, attachment.localPath);
+  if (!fs.existsSync(filename) || fs.statSync(filename).size !== attachment.size) throw new Error(`Missing or changed asset: ${filename}`);
+  assets.set(attachment.id, filename);
+}
+if (assets.size !== 25) throw new Error(`Expected 25 unique assets, found ${assets.size}`);
+if (!html.includes("$('#attachmentPreview').addEventListener('wheel'")) throw new Error('Existing wheel zoom update was lost');
+if (html.includes("document.createElement('iframe')")) throw new Error('A PDF iframe can still intercept the wheel');
+const pdfMatch = html.match(/<script id="bundledFileAssets" type="application\/json">([\s\S]*?)<\/script>/);
+if (!pdfMatch) throw new Error('Bundled PDF data is missing');
+const pdfAssets = JSON.parse(pdfMatch[1]);
+const pdfPath = 'assets/2026-11-09/color-card-print.pdf';
+const expectedPdf = fs.readFileSync(path.join(root, pdfPath));
+const actualPdf = Buffer.from(pdfAssets[pdfPath] || '', 'base64');
+const sha = data => crypto.createHash('sha256').update(data).digest('hex');
+if (sha(expectedPdf) !== sha(actualPdf)) throw new Error('Bundled PDF bytes do not match the linked attachment');
+if (!html.includes('await openViewerPdf(bytes,token)') || !html.includes('await openViewerPdf(new Uint8Array(await stored.blob.arrayBuffer()),token)')) throw new Error('PDF attachments are not rendered in the zoomable stage');
+if (!html.includes('id="viewerPdfPrev"') || !html.includes('id="viewerPdfNext"')) throw new Error('PDF page controls are missing');
+const mainMarker = '  <script>\n    (() => {';
+const start = html.lastIndexOf(mainMarker);
+if (start < 0) throw new Error('Dashboard script is missing');
+const end = html.indexOf('  </script>', start);
+if (end < 0) throw new Error('Dashboard script is unterminated');
+new vm.Script(html.slice(start + '  <script>'.length, end), { filename: 'dashboard.js' });
+console.log(`Verified: 5 work items, 33 details, ${assets.size} assets, matching embedded PDF, dashboard JavaScript syntax, wheel zoom for all preview types`);
