@@ -6,7 +6,7 @@ const vendor = path.join(root, 'vendor');
 const licenses = path.join(root, 'licenses');
 const source = path.join(root, 'src', 'dashboard-source.html');
 const output = path.join(root, '周期汇报看板.html');
-const html = fs.readFileSync(source, 'utf8');
+const html = fs.readFileSync(source, 'utf8').replace(/\r\n/g, '\n');
 const reportFiles = fs.readdirSync(path.join(root, 'src')).filter(name => /^weekly-report-\d{4}-\d{2}-\d{2}\.json$/.test(name)).sort();
 const reports = reportFiles.map(name => JSON.parse(fs.readFileSync(path.join(root, 'src', name), 'utf8')));
 if (!reports.length) throw new Error('No weekly report JSON found in src');
@@ -47,7 +47,7 @@ const embedded = [
   `  <script id="ocrWorker" type="application/x-ocr-worker">${assets.ocrWorker}</script>`,
   `  <script id="ocrLang" type="application/x-ocr-language">${assets.ocrLang}</script>`,
   `  <script id="thirdPartyLicenses" type="text/plain">${assets.licenses}</script>`,
-  `  <script type="text/javascript">${assets.ocrMain}</script>`
+  `  <script id="ocrMain" type="text/javascript">${assets.ocrMain}</script>`
 ].join('\n') + '\n';
 
 // Replacement callback keeps dollar signs inside bundled libraries literal.

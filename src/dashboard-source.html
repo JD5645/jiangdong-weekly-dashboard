@@ -688,6 +688,7 @@
       const clamp = (value, min, max) => Math.min(max, Math.max(min, Number(value) || 0));
       const attachmentKind = item => { const name=String(item?.name || '').toLowerCase(),type=String(item?.type || '').toLowerCase(); if(type.startsWith('image/') || /\.(png|jpe?g|gif|webp|bmp|svg|avif)$/.test(name))return 'image';if(type.startsWith('video/') || /\.(mp4|webm|mov|m4v|ogv)$/.test(name))return 'video';if(type==='application/pdf' || name.endsWith('.pdf'))return 'pdf';if(/\.(csv|tsv|xlsx|xls|ods)$/.test(name) || /spreadsheet|excel|csv/.test(type))return 'table';if(/\.(docx|txt|md|markdown|json|rtf)$/.test(name) || type.startsWith('text/') || type==='application/vnd.openxmlformats-officedocument.wordprocessingml.document')return 'document';return 'file'; };
       const bundledAssetPath = value => /^assets\/\d{4}-\d{2}-\d{2}\/[A-Za-z0-9._-]+\.(?:png|jpe?g|webp|gif|bmp|avif|pdf|xlsx|xls|csv|tsv|docx|txt|md|mp4|webm)$/i.test(String(value||'')) ? String(value) : '';
+      const cloudThumbnailUrl = value => {const match=/^assets\/(\d{4}-\d{2}-\d{2})\/([A-Za-z0-9._-]+\.(?:png|jpe?g|webp|gif|bmp|avif))$/i.exec(String(value||''));return cloudMode&&match?`/thumbs/${match[1]}/${match[2]}.webp`:'';};
       let attachmentDBPromise=null, pendingAttachmentIndex=-1, pendingAttachmentDetail=-1, pendingAttachmentKey='', viewerUrl=null, viewerFocus=null, viewedAttachment=null, viewerToken=0, viewerPdf=null;
       let noteViewerFocus=null, viewedNoteKey='';
       const expandedWork=new Set();
@@ -1139,7 +1140,7 @@
         const cloud=cloudFilePath(attachment.cloudPath);
         const thumbnail=bundledAssetPath(attachment.thumbnailPath);
         const cloudThumbnail=cloudFilePath(attachment.cloudThumbnailPath);
-        const content=kind==='image'?`<img data-detail-thumb='${id}' ${local?`data-detail-local-src='${esc(assetUrl(local))}'`:cloud?`data-detail-cloud-src='${esc(cloud)}'`:''} alt='${name}'>`:kind==='video'?`<video data-detail-video='${id}' ${local?`data-detail-local-src='${esc(assetUrl(local))}'`:cloud?`data-detail-cloud-src='${esc(cloud)}'`:''} muted playsinline preload='auto' aria-hidden='true'></video><span class='work-detail-media-label'>视频</span>`:thumbnail||cloudThumbnail?`<img src='${esc(thumbnail?assetUrl(thumbnail):cloudThumbnail)}' alt=''><span class='work-detail-media-label'>${kind==='table'?'表格':kind==='pdf'?'PDF':kind==='document'?'文档':'文件'}</span>`:attachment.thumbnailId?`<img data-detail-local-thumbnail='${id}' alt=''><span class='work-detail-media-label'>${kind==='table'?'表格':kind==='pdf'?'PDF':kind==='document'?'文档':'文件'}</span>`:`${icons[kind]}<small>${kind==='table'?'表格':kind==='pdf'?'PDF':kind==='document'?'文档':'文件'}</small>`;
+        const content=kind==='image'?`<img data-detail-thumb='${id}' loading='lazy' ${local?`data-detail-local-src='${esc(cloudThumbnailUrl(local)||assetUrl(local))}' data-detail-full-src='${esc(assetUrl(local))}'`:cloud?`data-detail-cloud-src='${esc(cloud)}'`:''} alt='${name}'>`:kind==='video'?`<video data-detail-video='${id}' ${local?`data-detail-local-src='${esc(assetUrl(local))}'`:cloud?`data-detail-cloud-src='${esc(cloud)}'`:''} muted playsinline preload='auto' aria-hidden='true'></video><span class='work-detail-media-label'>视频</span>`:thumbnail||cloudThumbnail?`<img src='${esc(thumbnail?assetUrl(thumbnail):cloudThumbnail)}' loading='lazy' alt=''><span class='work-detail-media-label'>${kind==='table'?'表格':kind==='pdf'?'PDF':kind==='document'?'文档':'文件'}</span>`:attachment.thumbnailId?`<img data-detail-local-thumbnail='${id}' loading='lazy' alt=''><span class='work-detail-media-label'>${kind==='table'?'表格':kind==='pdf'?'PDF':kind==='document'?'文档':'文件'}</span>`:`${icons[kind]}<small>${kind==='table'?'表格':kind==='pdf'?'PDF':kind==='document'?'文档':'文件'}</small>`;
         return `<button type='button' class='work-detail-image ${kind==='image'||kind==='video'?'':'work-detail-file'}' data-view-attachment='${id}' data-work-index='${index}' title='查看 ${name}' aria-label='查看文件 ${name}'>${content}</button>`;
       }
       function renderDetailPanel(w,i) {
@@ -1150,7 +1151,7 @@
       }
       async function fillWorkDetailImages(index) {
         const panel=document.getElementById(`work-detail-${index}`);if(!panel || panel.hidden)return;
-        for(const media of panel.querySelectorAll('[data-detail-thumb],[data-detail-video],[data-detail-local-thumbnail]')) {if(media.dataset.detailLocalSrc){media.src=media.dataset.detailLocalSrc;continue;}if(media.dataset.detailCloudSrc){media.src=media.dataset.detailCloudSrc;continue;}const id=media.dataset.detailLocalThumbnail?`thumb-${media.dataset.detailLocalThumbnail}`:media.dataset.detailThumb||media.dataset.detailVideo;try{const stored=await getAttachment(id);if(!media.isConnected || !stored?.blob)continue;const url=URL.createObjectURL(stored.blob);if(media.tagName==='IMG'){media.onload=()=>URL.revokeObjectURL(url);media.onerror=()=>URL.revokeObjectURL(url);}else{media.onloadeddata=()=>{try{const canvas=document.createElement('canvas');canvas.width=Math.min(media.videoWidth||90,360);canvas.height=Math.min(media.videoHeight||90,360);canvas.getContext('2d').drawImage(media,0,0,canvas.width,canvas.height);const image=document.createElement('img');image.alt='视频缩略图';image.src=canvas.toDataURL('image/png');media.replaceWith(image);}catch(_){}URL.revokeObjectURL(url);};media.onerror=()=>URL.revokeObjectURL(url);}media.src=url;}catch(_){} }
+        for(const media of panel.querySelectorAll('[data-detail-thumb],[data-detail-video],[data-detail-local-thumbnail]')) {if(media.dataset.detailLocalSrc){if(media.dataset.detailFullSrc&&media.dataset.detailFullSrc!==media.dataset.detailLocalSrc)media.onerror=()=>{media.onerror=null;media.src=media.dataset.detailFullSrc;};media.src=media.dataset.detailLocalSrc;continue;}if(media.dataset.detailCloudSrc){media.src=media.dataset.detailCloudSrc;continue;}const id=media.dataset.detailLocalThumbnail?`thumb-${media.dataset.detailLocalThumbnail}`:media.dataset.detailThumb||media.dataset.detailVideo;try{const stored=await getAttachment(id);if(!media.isConnected || !stored?.blob)continue;const url=URL.createObjectURL(stored.blob);if(media.tagName==='IMG'){media.onload=()=>URL.revokeObjectURL(url);media.onerror=()=>URL.revokeObjectURL(url);}else{media.onloadeddata=()=>{try{const canvas=document.createElement('canvas');canvas.width=Math.min(media.videoWidth||90,360);canvas.height=Math.min(media.videoHeight||90,360);canvas.getContext('2d').drawImage(media,0,0,canvas.width,canvas.height);const image=document.createElement('img');image.alt='视频缩略图';image.src=canvas.toDataURL('image/png');media.replaceWith(image);}catch(_){}URL.revokeObjectURL(url);};media.onerror=()=>URL.revokeObjectURL(url);}media.src=url;}catch(_){} }
       }
       function materializeWorkDetail(index,slot) {
         const item=report.work[index];if(locked || !item || !Number.isInteger(slot) || slot<0 || slot>=100)return false;
@@ -1346,12 +1347,17 @@
         }
         viewerView.scale=next;renderViewerTransform();
       }
-      function bundledFileBytes(path) {
+      async function bundledFileBytes(path) {
+        if(cloudMode){
+          const response=await fetch(assetUrl(path));
+          if(!response.ok)return null;
+          return new Uint8Array(await response.arrayBuffer());
+        }
         const encoded=bundledFileAssets[path];
         return encoded?Uint8Array.from(atob(encoded),character=>character.charCodeAt(0)):null;
       }
-      function bundledFileBlob(path,type) {
-        const bytes=bundledFileBytes(path);
+      async function bundledFileBlob(path,type) {
+        const bytes=await bundledFileBytes(path);
         if(!bytes)throw new Error('文件数据未随看板打包');
         return new Blob([bytes],{type:type||'application/octet-stream'});
       }
@@ -1417,10 +1423,10 @@
             preview.replaceChildren();
             if(kind==='image'){const image=document.createElement('img');image.src=assetUrl(local);image.alt=meta.name;image.onerror=()=>{if(token===viewerToken)preview.textContent='图片未找到，请检查 assets 文件夹。';};preview.append(image);}
             else if(kind==='video'){const video=document.createElement('video');video.src=assetUrl(local);video.controls=true;video.playsInline=true;preview.append(video);}
-            else if(kind==='pdf'){const bytes=bundledFileBytes(local);if(!bytes)throw new Error('项目中的 PDF 缺失，请重新构建项目');preview.textContent='正在渲染 PDF…';await openViewerPdf(bytes,token);}
-            else if(kind==='table' && /\.(csv|tsv)$/i.test(meta.name)){const rows=parseDelimited(await bundledFileBlob(local,meta.type).text(),/\.tsv$/i.test(meta.name)?'\t':',');if(token===viewerToken)preview.append(rows.length?renderFileTable(rows):document.createTextNode('表格为空'));}
-            else if(kind==='table' && /\.xlsx$/i.test(meta.name)){const rows=await previewXlsx(bundledFileBlob(local,meta.type));if(token===viewerToken)preview.append(rows.length?renderFileTable(rows):document.createTextNode('表格为空'));}
-            else if(kind==='document'){const documentView=await previewDocument(bundledFileBlob(local,meta.type),meta.name);if(token===viewerToken)preview.append(documentView);}
+            else if(kind==='pdf'){const bytes=await bundledFileBytes(local);if(!bytes)throw new Error('项目中的 PDF 缺失，请重新构建项目');preview.textContent='正在渲染 PDF…';await openViewerPdf(bytes,token);}
+            else if(kind==='table' && /\.(csv|tsv)$/i.test(meta.name)){const rows=parseDelimited(await (await bundledFileBlob(local,meta.type)).text(),/\.tsv$/i.test(meta.name)?'\t':',');if(token===viewerToken)preview.append(rows.length?renderFileTable(rows):document.createTextNode('表格为空'));}
+            else if(kind==='table' && /\.xlsx$/i.test(meta.name)){const rows=await previewXlsx(await bundledFileBlob(local,meta.type));if(token===viewerToken)preview.append(rows.length?renderFileTable(rows):document.createTextNode('表格为空'));}
+            else if(kind==='document'){const documentView=await previewDocument(await bundledFileBlob(local,meta.type),meta.name);if(token===viewerToken)preview.append(documentView);}
             else preview.textContent='请使用下载按钮打开此文件。';
             return;
           }
@@ -1467,9 +1473,14 @@
           report.demo=false;report.autoGenerated=false;saveNow();renderAll();const bundled=new Set(report.work.flatMap(item=>item.attachments||[]).filter(asset=>bundledAssetPath(asset.localPath)).map(asset=>asset.id)).size;notify(`报告已导入，包含 ${ids.size+bundled} 个附件`);return true;
         } catch(error) {notify(`导入失败：${error.message || '文件格式不正确'}`);return false;}
       }
-      let pdfEnginePromise=null, pdfWorkerUrl=null, ocrLanguagePromise=null, reportImportDraft=null, pendingImportFile=null;
+      let pdfEnginePromise=null, pdfWorkerUrl=null, ocrLanguagePromise=null, ocrScriptPromise=null, reportImportDraft=null, pendingImportFile=null;
       async function loadPdfEngine() {
         if(!pdfEnginePromise)pdfEnginePromise=(async()=>{
+          if(cloudMode){
+            const pdfjs=await import('/vendor/pdf.min.mjs');
+            pdfjs.GlobalWorkerOptions.workerSrc='/vendor/pdf.worker.min.mjs';
+            return pdfjs;
+          }
           const main=$('#pdfJsModule')?.textContent,worker=$('#pdfJsWorker')?.textContent;
           if(!main || !worker)throw new Error('PDF 解析模块缺失');
           const moduleUrl=URL.createObjectURL(new Blob([main],{type:'text/javascript'}));
@@ -1521,8 +1532,15 @@
       }
       async function prepareOcrLanguage() {
         if(!ocrLanguagePromise)ocrLanguagePromise=(async()=>{
-          const encoded=$('#ocrLang')?.textContent;if(!encoded)throw new Error('本机图片识别模块缺失');
-          const compressed=Uint8Array.from(atob(encoded),character=>character.charCodeAt(0));
+          let compressed;
+          if(cloudMode){
+            const response=await fetch('/vendor/chi_sim.traineddata.gz');
+            if(!response.ok)throw new Error('图片识别语言文件未找到');
+            compressed=new Uint8Array(await response.arrayBuffer());
+          } else {
+            const encoded=$('#ocrLang')?.textContent;if(!encoded)throw new Error('本机图片识别模块缺失');
+            compressed=Uint8Array.from(atob(encoded),character=>character.charCodeAt(0));
+          }
           const data=new Uint8Array(await new Response(new Blob([compressed]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer());
           const db=await new Promise((resolve,reject)=>{const request=indexedDB.open('keyval-store',1);request.onupgradeneeded=()=>request.result.createObjectStore('keyval');request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error||new Error('本地识别数据无法保存'));});
           try {await new Promise((resolve,reject)=>{const tx=db.transaction('keyval','readwrite');tx.objectStore('keyval').put(data,'./chi_sim.traineddata');tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error||new Error('本地识别数据无法保存'));});}
@@ -1532,8 +1550,17 @@
       }
       async function createLocalOcrWorker() {
         await prepareOcrLanguage();
+        if(cloudMode && !window.Tesseract?.createWorker){
+          if(!ocrScriptPromise)ocrScriptPromise=new Promise((resolve,reject)=>{
+            const script=document.createElement('script');script.src='/vendor/tesseract.min.js';
+            script.onload=resolve;script.onerror=()=>reject(new Error('图片识别模块加载失败'));
+            document.head.append(script);
+          }).catch(error=>{ocrScriptPromise=null;throw error;});
+          await ocrScriptPromise;
+        }
         if(!window.Tesseract?.createWorker)throw new Error('本机图片识别模块不可用');
-        const source=$('#ocrWorker')?.textContent;if(!source)throw new Error('本机图片识别模块缺失');
+        const source=cloudMode?await (async()=>{const response=await fetch('/vendor/ocr-worker.js');if(!response.ok)throw new Error('图片识别工作模块加载失败');return response.text();})():$('#ocrWorker')?.textContent;
+        if(!source)throw new Error('本机图片识别模块缺失');
         const url=URL.createObjectURL(new Blob([source],{type:'text/javascript'}));
         try {const worker=await Tesseract.createWorker('chi_sim',1,{workerPath:url,cachePath:'.',cacheMethod:'readOnly',langPath:'about:blank',workerBlobURL:false});return {worker,url};}
         catch(error){URL.revokeObjectURL(url);throw error;}
