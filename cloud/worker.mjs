@@ -1,3 +1,5 @@
+import { personal } from './personal.mjs';
+
 const REPORT_PATH = 'data/reports.json';
 const MAX_ATTACHMENT_BYTES = 20 * 1024 * 1024;
 const FILE_KEY = /^(?:thumb-)?[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(?:png|jpe?g|webp|gif|bmp|avif|svg|pdf|xlsx|xls|ods|csv|tsv|docx|doc|pptx|txt|md|json|rtf|zip|mp4|webm|mov|m4v|ogv|bin)$/i;
@@ -49,21 +51,22 @@ function teamOrigin(env) {
   return url.origin;
 }
 
-async function verifyEditor(request, env) {
+async function verifyIdentity(request, env, audienceName, allowedEmail) {
   const token = request.headers.get('Cf-Access-Jwt-Assertion');
-  if (!token || !env.ACCESS_AUD || !env.EDITOR_EMAIL) return false;
+  if (!token || !env[audienceName]) return false;
   const parts = token.split('.');
   if (parts.length !== 3) return false;
   try {
     const header = JSON.parse(new TextDecoder().decode(base64url(parts[0])));
     const payload = JSON.parse(new TextDecoder().decode(base64url(parts[1])));
     const origin = teamOrigin(env);
-    const audiences = String(env.ACCESS_AUD).split(',').map(value => value.trim()).filter(Boolean);
+    const audiences = String(env[audienceName]).split(',').map(value => value.trim()).filter(Boolean);
     const tokenAudiences = Array.isArray(payload.aud) ? payload.aud : [payload.aud];
     const now = Math.floor(Date.now() / 1000);
     if (header.alg !== 'RS256' || !header.kid || payload.iss !== origin || !audiences.some(audience => tokenAudiences.includes(audience)) ||
         !Number.isFinite(payload.exp) || payload.exp <= now || (payload.nbf && payload.nbf > now) ||
-        String(payload.email || '').toLowerCase() !== String(env.EDITOR_EMAIL).toLowerCase()) return false;
+        !String(payload.email || '').includes('@') ||
+        (allowedEmail && String(payload.email || '').toLowerCase() !== allowedEmail.toLowerCase())) return false;
     const response = await fetch(`${origin}/cdn-cgi/access/certs`, { headers: { Accept: 'application/json' } });
     if (!response.ok) return false;
     const jwks = await response.json();
@@ -77,6 +80,8 @@ async function verifyEditor(request, env) {
     return false;
   }
 }
+
+const verifyEditor = (request,env) => env.EDITOR_EMAIL ? verifyIdentity(request,env,'ACCESS_AUD',env.EDITOR_EMAIL) : false;
 
 function githubUrl(env, path) {
   const owner = encodeURIComponent(String(env.GITHUB_OWNER || ''));
@@ -212,6 +217,16 @@ export default {
       if (path === '/api/state' && request.method === 'GET') return await readState(env);
       const readFile = path.match(/^\/api\/attachments\/([^/]+)$/);
       if (readFile && request.method === 'GET') return await readAttachment(env, readFile[1]);
+
+      if (path === '/app' || path === '/app/' || path.startsWith('/api/user/')) {
+        const email = await verifyIdentity(request,env,'USER_ACCESS_AUD');
+        if (!email) return json({ error: 'Login required' }, 403);
+        if (path === '/app' || path === '/app/') {
+          const assetUrl = new URL('/dashboard.html', request.url);
+          return env.ASSETS.fetch(new Request(assetUrl,request));
+        }
+        return personal(request,env,email,validateReports);
+      }
 
       if (path.startsWith('/editor') || path.startsWith('/api/write/')) {
         const email = await verifyEditor(request, env);

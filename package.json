@@ -6,7 +6,7 @@
   "scripts": {
     "build": "vite build",
     "deploy": "cf deploy",
-    "verify": "node tools/verify-week.cjs && node --test cloud/worker.test.mjs"
+    "verify": "node tools/verify-week.cjs && node --test cloud/worker.test.mjs cloud/personal.test.mjs"
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "2.0.0-rc.0",

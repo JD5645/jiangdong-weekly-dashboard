@@ -14,7 +14,7 @@
 - `assets/2026-11-09/`：25 个按型号匹配的场景图和色卡 PDF，保留原始分辨率；`manifest.json` 记录源路径。
 - `skills/jiangdong-weekly-dashboard/`：可复用的“江东·周报汇报看板生成” Skill，包含周报提取、附件匹配、缩略图生成和验证脚本；同一份 Skill 也安装在全局目录。
 - `tools/build.cjs`：将源码与 `vendor` 中的本地组件打包为成品 HTML。
-- `cloud/worker.mjs`：在线版的公开读取、Cloudflare Access 登录校验及 GitHub 写入 API。
+- `cloud/worker.mjs`、`cloud/personal.mjs`：在线版的公开读取、Cloudflare Access 登录校验、管理员 GitHub 写入及个人 D1 读写 API。
 - `data/reports.json`：在线版所有周期的报告数据；网页编辑成功后此文件会在仓库中更新。
 - `tools/build-cloud.cjs`、`cloudflare.config.ts`、`vite.config.ts`：Cloudflare Worker 与静态附件构建。
 - `tools/import_week_2026_11_09.py`：从原工作簿和表内 E 盘路径重新生成这期报告及附件副本。
@@ -48,7 +48,7 @@ node .\tools\build.cjs
 
 在 Codex 中调用“江东·周报汇报看板生成”（内部名称 `$jiangdong-weekly-dashboard`），按“技能 + 待解析文件 + 路径 + 备注（可选）”发送即可。待解析文件支持图片、PDF、XLSX、Word DOCX、HTML 和网页链接等；路径指型号/项目附件位置。Skill 会先提取并核对周报内容，再按路径复制原文件、生成 PDF 首页与表格内容缩略图、写入新周期 JSON，最后重新构建离线 HTML。图片和扫描 PDF 需要 Codex 做视觉识读；找不到对应图片的明细保留型号与事件名，附件留空并列入未匹配清单。
 
-脚本依赖列在 `skills/jiangdong-weekly-dashboard/requirements.txt`；生成 PDF 首页缩略图还需 `pdftoppm`。离线版在本机处理文件；在线版编辑后将报告及新增附件提交到公开 GitHub 仓库。
+脚本依赖列在 `skills/jiangdong-weekly-dashboard/requirements.txt`；生成 PDF 首页缩略图还需 `pdftoppm`。离线版在本机处理文件；在线管理员编辑会将报告及新增附件提交到公开 GitHub 仓库，个人账号的数据保存在 Cloudflare D1。
 
 ## 将已填写的报告迁移到新电脑
 
@@ -58,4 +58,4 @@ node .\tools\build.cjs
 
 ## 维护要求
 
-保持离线版可直接打开；在线版公开可查看，只有指定邮箱通过 Cloudflare Access 后可编辑。修改时保持现有本地存储键、JSON 格式及旧数据兼容；勿清除用户浏览器数据。保留黑底、白色结构、红色重点和无衬线字体。每次修改后检查桌面与手机布局，以及相关编辑、锁定、附件预览、导入和云端同步流程。
+保持离线版可直接打开；在线公开看板可查看，只有指定管理员邮箱可编辑公开仓库内容。其他用户从 `/app/` 使用邮箱验证码登录，首次登录自动创建独立看板；个人周报和附件仅写入各自的 D1 空间。修改时保持现有本地存储键、JSON 格式及旧数据兼容；勿清除用户浏览器数据。保留黑底、白色结构、红色重点和无衬线字体。每次修改后检查桌面与手机布局，以及相关编辑、锁定、附件预览、导入和云端同步流程。
