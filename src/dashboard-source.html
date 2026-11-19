@@ -711,8 +711,9 @@
       const monthStart = date => new Date(date.getFullYear(),date.getMonth(),1);
       const weekNumber = date => { const d = new Date(Date.UTC(date.getFullYear(),date.getMonth(),date.getDate())); d.setUTCDate(d.getUTCDate()+4-(d.getUTCDay()||7)); const year = d.getUTCFullYear(); return {year, number: Math.ceil((((d-new Date(Date.UTC(year,0,1)))/86400000)+1)/7)}; };
       const fmtDay = date => `${date.getMonth()+1} 月 ${date.getDate()} 日`;
-      const now = new Date();
-      const periodDates = {week:monday(now), month:monthStart(now)};
+      const currentPeriodDate = (type, date = new Date()) => type === 'week' ? monday(date) : monthStart(date);
+      const openedAt = new Date();
+      const periodDates = {week:currentPeriodDate('week', openedAt), month:currentPeriodDate('month', openedAt)};
       let mode = 'week';
       let report = null;
       let reports = {};
@@ -749,9 +750,12 @@
           }
         }
       }
-      if(bundledReports.length){periodDates.week=parseLocal(bundledReports[bundledReports.length-1].dateStart);if(!cloudMode)try{localStorage.setItem(STORAGE_KEY,JSON.stringify(reports));}catch(_){storageAvailable=false;}}
+      if (!cloudMode && bundledReports.length) {
+        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(reports)); }
+        catch (_) { storageAvailable = false; }
+      }
       const currentKey = () => `${mode}:${localISO(periodDates[mode])}`;
-      const isCurrent = () => localISO(periodDates[mode]) === localISO(mode === 'week' ? monday(now) : monthStart(now));
+      const isCurrent = () => localISO(periodDates[mode]) === localISO(currentPeriodDate(mode));
       function labelsForPeriod() {
         if (mode === 'week') { const end = new Date(periodDates.week); end.setDate(end.getDate()+6); const w=weekNumber(periodDates.week); return {name:`${w.year} 年第 ${w.number} 周`,range:`${fmtDay(periodDates.week)} — ${fmtDay(end)}`,title:`第 ${w.number} 周 · 工作进展`}; }
         const d=periodDates.month, end=new Date(d.getFullYear(),d.getMonth()+1,0); return {name:`${d.getFullYear()} 年 ${d.getMonth()+1} 月`,range:`${fmtDay(d)} — ${fmtDay(end)}`,title:`${d.getFullYear()} 年 ${d.getMonth()+1} 月 · 工作进展`};
@@ -770,24 +774,8 @@
         const label=date=>`${showYear?`${date.getFullYear()} 年 `:''}${fmtDay(date)}`;
         return `${label(start)}${validTime(report.timeStart)?` ${report.timeStart}`:''} — ${label(end)}${validTime(report.timeEnd)?` ${report.timeEnd}`:''}`;
       }
-      function makeReport(demo) {
+      function makeEmptyReport() {
         const label=labelsForPeriod();
-        if (demo && mode==='week') return {
-          demo:true, title:label.title, team:'产品与项目组', owner:'汇报人', summary:'围绕版本交付、流程优化和跨团队协同推进工作。核心事项按计划落地，重点问题已明确负责人和处理节点。', conclusion:'关键交付按计划推进，下一阶段聚焦上线验证与协同收口。',
-          metrics:[{label:'完成事项',value:'12',unit:'项',note:'较上期增加 3 项'},{label:'目标达成率',value:'86',unit:'%',note:'计划节点整体可控'},{label:'推进项目',value:'4',unit:'个',note:'其中 2 个已交付'},{label:'待协调事项',value:'2',unit:'项',note:'已明确对接负责人'}],
-          trend:[{label:'周一',value:1},{label:'周二',value:2},{label:'周三',value:1},{label:'周四',value:3},{label:'周五',value:2},{label:'周六',value:1},{label:'周日',value:2}],
-          work:[{title:'完成核心功能验收',category:'项目交付',status:'done',progress:100,owner:'产品组',note:'验收清单已归档，问题完成复核'},{title:'梳理新版本上线方案',category:'版本计划',status:'doing',progress:78,owner:'项目组',note:'排期与灰度方案已确认'},{title:'优化周报数据汇总流程',category:'效率优化',status:'done',progress:100,owner:'运营组',note:'统一指标口径，减少重复整理'},{title:'跨团队需求对齐',category:'协同事项',status:'doing',progress:65,owner:'协同组',note:'剩余两项接口细节待确认'},{title:'准备下阶段复盘材料',category:'复盘分析',status:'todo',progress:25,owner:'项目组',note:'计划下周完成首版'}],
-          highlights:['关键功能完成验收，形成可复用的检查清单','团队协同节奏更稳定，需求响应时间缩短'],
-          plans:['推进上线前验证和灰度发布准备','完成数据复盘，明确下阶段优先级'],
-          risks:['两项跨团队接口细节待确认，需在下周二前给出结论'],updatedAt:null
-        };
-        if (demo && mode==='month') return {
-          demo:true, title:label.title, team:'产品与项目组', owner:'汇报人', summary:'本月围绕交付质量、业务协同与工作效率持续推进。主要里程碑按期达成，下一月将聚焦规模化落地。', conclusion:'本月目标总体达成，重点成果已交付，后续优先推进推广与复盘。',
-          metrics:[{label:'完成事项',value:'48',unit:'项',note:'覆盖交付与流程优化'},{label:'目标达成率',value:'91',unit:'%',note:'核心目标按期完成'},{label:'推进项目',value:'6',unit:'个',note:'其中 4 个已交付'},{label:'待协调事项',value:'3',unit:'项',note:'已纳入下月计划'}],
-          trend:[{label:'第 1 周',value:9},{label:'第 2 周',value:13},{label:'第 3 周',value:11},{label:'第 4 周',value:15}],
-          work:[{title:'完成阶段版本交付',category:'项目交付',status:'done',progress:100,owner:'产品组',note:'目标功能按期上线'},{title:'优化指标口径与数据流程',category:'效率优化',status:'done',progress:100,owner:'运营组',note:'形成统一汇报模板'},{title:'推进跨部门方案落地',category:'协同事项',status:'doing',progress:76,owner:'项目组',note:'主要流程已完成对齐'},{title:'下月路线图规划',category:'版本计划',status:'todo',progress:35,owner:'产品组',note:'待确认资源排期'}],
-          highlights:['关键里程碑按期交付，工作流程形成标准模板','月度目标达成率保持在较高水平'],plans:['推进已交付成果的规模化应用','完善下月路线图与资源安排'],risks:['部分资源安排尚待确认，需尽早锁定排期'],updatedAt:null
-        };
         return {demo:false,title:label.title,team:'',owner:'',summary:'',conclusion:'',metrics:[{label:'完成事项',value:'0',unit:'项',note:''},{label:'目标达成率',value:'0',unit:'%',note:''},{label:'推进项目',value:'0',unit:'个',note:''},{label:'待协调事项',value:'0',unit:'项',note:''}],trend:(mode==='week'?['周一','周二','周三','周四','周五','周六','周日']:['第 1 周','第 2 周','第 3 周','第 4 周']).map(label=>({label,value:0})),work:[],highlights:[],plans:[],risks:[],updatedAt:null};
       }
       function normalizeReport(input) {
@@ -850,7 +838,7 @@
       }
       const metricNumber = (item,index) => calculatedMetrics(item).values[index] ?? 0;
       function makeMonthlySummary(sources,signature=monthlySourceSignature(sources)) {
-        const monthly=normalizeReport(makeReport(false));
+        const monthly=normalizeReport(makeEmptyReport());
         monthly.autoGenerated=true;
         monthly.sourceSignature=signature;
         monthly.sourceWeeks=sources.map(source=>source.key.slice(5));
@@ -895,7 +883,7 @@
           if (stored && !stored.demo && !stored.autoGenerated) report=normalizeReport(stored);
           else if (stored?.autoGenerated && stored.sourceSignature===signature) report=normalizeReport(stored);
           else { report=makeMonthlySummary(sources,signature); if(!locked)saveNow(); }
-        } else report=stored ? normalizeReport(stored) : normalizeReport(makeReport(cloudPersonal?false:isCurrent()));
+        } else report=stored ? normalizeReport(stored) : normalizeReport(makeEmptyReport());
         if(!locked && stored?.work?.some(item=>!item.detailsIntegrated && ((item.attachments||[]).length || (item.details||[]).length)))saveNow();
         renderAll();
       }
@@ -1043,7 +1031,6 @@
           const data=await response.json();
           if(data.reports && typeof data.reports==='object' && !Array.isArray(data.reports) && (cloudPersonal||Object.keys(data.reports).length))reports=data.reports;
           cloudSha=data.sha||null;
-          if(cloudPersonal){const weeks=Object.keys(reports).filter(key=>/^week:\d{4}-\d{2}-\d{2}$/.test(key)).sort();if(weeks.length)periodDates.week=parseLocal(weeks.at(-1).slice(5));}
           loadReport();
           if(cloudEditor||cloudPersonal){
             const sessionResponse=await fetch(cloudPersonal?'/api/user/session':'/api/write/session',{cache:'no-store',credentials:'same-origin'});
@@ -1096,6 +1083,7 @@
         $('#metrics').innerHTML=report.metrics.map((m,i)=>`<div class="metric"><div class="metric-top"><span>${esc(m.label || '未命名指标')}</span><span class="metric-glyph">${icons[fallbackIcons[i]]}</span></div><div class="metric-value" title="${esc(m.value)} ${esc(m.unit)}">${esc(m.value || '0')}<small>${esc(m.unit)}</small></div><div class="metric-note">${esc(m.note || (i===0 && calculated.mixedUnits?'包含不同单位，请核对合计':'暂无备注'))}</div>${locked?'':`<button type="button" class="metric-hitarea" data-edit-metric="${i}" title="点击编辑${esc(m.label || '指标')}" aria-label="编辑${esc(m.label || '第 '+(i+1)+'项')}指标"></button>`}</div>`).join('');
       }
       function defaultCompletionDate() {
+        const now = new Date();
         const start=periodDates[mode],end=new Date(start);
         if (mode==='week') end.setDate(end.getDate()+6); else end.setMonth(end.getMonth()+1,0);
         return localISO(now>=start && now<=end?now:end);
@@ -1757,7 +1745,7 @@
       $('#monthMode').addEventListener('click',()=>changeMode('month'));
       $('#prevPeriod').addEventListener('click',()=>movePeriod(-1));
       $('#nextPeriod').addEventListener('click',()=>movePeriod(1));
-      $('#currentPeriod').addEventListener('click',()=>{if(saveTimer)saveNow();periodDates[mode]=mode==='week'?monday(now):monthStart(now);loadReport();});
+      $('#currentPeriod').addEventListener('click',()=>{if(saveTimer)saveNow();periodDates[mode]=currentPeriodDate(mode);loadReport();});
       $('#refreshMonth').addEventListener('click',()=>{if(locked || mode!=='month')return;const sources=monthlySources();if(!sources.length){notify('本月暂无已填写周报');return;}if(!report.autoGenerated && !confirm('重新汇总会覆盖当前月报的手动修改，继续吗？'))return;rememberChange();report=makeMonthlySummary(sources);saveNow();renderAll();notify(`已根据 ${sources.length} 份周报重新汇总`);});
       $('#lockModeBtn').addEventListener('click',()=>setLocked(!locked));
       $('#cloudAction').addEventListener('click',()=>{if(!cloudMode)return;if(!cloudEditor&&!cloudPersonal)location.assign('/app/');else if(!cloudSession)location.reload();else {if(saveTimer)saveNow();syncCloud();}});
@@ -1872,7 +1860,7 @@
         const trendMode=e.target.closest('[data-trend-mode]');if(trendMode){if(report.trendMode===trendMode.dataset.trendMode)return;rememberChange();report.trendMode=trendMode.dataset.trendMode;queueSave();renderPreview();renderEditor();return;}
         if (e.target.id==='addTrend') {if(report.trend.length>=16){notify('最多添加 16 个时间点');return;}rememberChange();report.trend.push({label:`时间点 ${report.trend.length+1}`,value:0});queueSave();renderPreview();renderEditor();$('#editorBody').scrollTop=$('#editorBody').scrollHeight;return;}
         if (e.target.id==='resetDateRange') {rememberChange();const dates=defaultDates();report.dateStart=dates.start;report.dateEnd=dates.end;report.timeStart='';report.timeEnd='';queueSave();renderPreview();renderEditor();return;}
-        if (e.target.id==='clearReport') {if(!confirm('确定清空本期报告吗？此操作会替换当前周期内容。'))return;rememberChange();report=normalizeReport(makeReport(false));queueSave();renderPreview();renderEditor();notify('本期内容已清空');}
+        if (e.target.id==='clearReport') {if(!confirm('确定清空本期报告吗？此操作会替换当前周期内容。'))return;rememberChange();report=normalizeReport(makeEmptyReport());queueSave();renderPreview();renderEditor();notify('本期内容已清空');}
       });
       $('#exportBtn').addEventListener('click',download);
       $('#importBtn').addEventListener('click',()=>{if(!locked)$('#reportFileInput').click();});
